@@ -89,3 +89,50 @@ Team members will divide responsibilities among data exploration, tracking featu
 3. **NFL Combine results:** `combine_results.csv`. Source for conventional Combine measurements and prospect scores.  
 4. **NFL performance data:** `player_career_successes.csv` and `player_play.csv`. Sources for subsequent participation and on-field performance outcomes.
 
+
+
+# Data and Reference Result
+
+**Checkpoint:** November 5, 2026, by 11:59 PM Mountain Time  
+**Team:** Jose De Leon, Rylan Van Komen, Nick Austin  
+**Date:** November 6, 2026
+
+## Data
+
+Our project uses NFL Combine and player career data obtained from the NFL Big Data Bowl dataset on Kaggle. We downloaded four relevant CSV files and organized them in a local `data` directory for analysis in Jupyter Notebook.
+
+The datasets currently available are:
+
+| Dataset | Observations | Variables | Description |
+|---|---:|---:|---|
+| `combine_results.csv` | 510 | 18 | Traditional NFL Combine measurements and NGS scores |
+| `combine_tracking.csv` | 463,189 | 14 | Player movement and sensor measurements during Combine drills |
+| `player_career_successes.csv` | 510 | 9 | Career participation and achievement statistics |
+| `player_play.csv` | 314,197 | 64 | Player participation and performance information during individual plays |
+
+All 510 players in the Combine Results dataset are also represented in the Combine Tracking and Career Successes datasets. Player Play contains 497 of those 510 players.
+
+Initial inspection identified missing values in several traditional Combine measurements, particularly the three-cone drill (330 missing), bench press (318 missing), and short shuttle (309 missing). The tracking and career datasets contained no missing values during our initial inspection. Player Play contains substantial missingness, likely because many variables apply only to specific positions or play situations.
+
+The tracking dataset includes nine drill types, including the 40-yard dash, three-cone drill, and short shuttle. It records player position, speed, acceleration, distance, and direction at individual time intervals. Tracking coverage varies by drill, with the 40-yard dash providing the largest comparable sample between traditional and sensor-based measurements (418 players).
+
+Remaining preparation includes engineering player-level movement features from the tracking observations, determining how to handle missing Combine measurements, and selecting an appropriate career outcome for prediction.
+
+## Evaluation Plan
+
+We plan to compare two modeling pipelines:
+
+1. **Traditional Combine model:** Uses conventional Combine measurements such as height, weight, 40-yard dash time, vertical jump, and other available measurements.
+2. **Combined model:** Uses traditional Combine measurements along with engineered features from sensor-based tracking data, such as maximum speed, average speed, acceleration, and movement characteristics.
+
+Both pipelines will use the same players and the same training and testing split to ensure a fair comparison. We will split data by player so that observations from the same player cannot appear in both training and testing sets.
+
+We will also account for missing measurements and differences in career exposure across draft years. All preprocessing and feature selection will be fitted using training data only to prevent information leakage.
+
+For a continuous career outcome, we will consider regression metrics such as mean absolute error (MAE) and root mean squared error (RMSE). We will also examine whether the additional tracking features meaningfully improve predictive performance over the traditional Combine model.
+
+## First Runnable Result
+
+We have successfully loaded and inspected all four datasets in a local Jupyter Notebook. Our initial runnable results include dataset dimensions, missing-value summaries, player ID overlap, and tracking drill coverage.
+
+No predictive baseline has been run yet. Our next step is to engineer player-level tracking features and establish a traditional Combine baseline before comparing it with the combined model.

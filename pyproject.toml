@@ -1,0 +1,22 @@
+[project]
+name = "stat486-kaggle-project"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "Jose De Leon", email = "jdleon4@byu.edu" }
+]
+requires-python = ">=3.13"
+dependencies = [
+    "ipykernel>=7.4.0",
+    "matplotlib>=3.11.2",
+    "numpy>=2.5.4",
+    "pandas>=3.1.1",
+]
+
+[project.scripts]
+stat486-kaggle-project = "stat486_kaggle_project:main"
+
+[build-system]
+requires = ["uv_build>=0.12.11,<0.13.0"]
+build-backend = "uv_build"
