@@ -136,3 +136,94 @@ For a continuous career outcome, we will consider regression metrics such as mea
 We have successfully loaded and inspected all four datasets in a local Jupyter Notebook. Our initial runnable results include dataset dimensions, missing-value summaries, player ID overlap, and tracking drill coverage.
 
 No predictive baseline has been run yet. Our next step is to engineer player-level tracking features and establish a traditional Combine baseline before comparing it with the combined model.
+
+
+
+# Working Investigation
+
+**Checkpoint:** November 12, 2026  
+**Team:** Jose De Leon, Rylan Van Komen, Nick Austin  
+**Route:** B (Kaggle competition)  
+**Date:** November 14, 2026
+
+## Working code and evidence
+
+**What runs now.** Pipeline 1 runs end to end in [`kaggle_pipeline.ipynb`](kaggle_pipeline.ipynb). It prepares a one-row-per-player table, validates locally, trains, and writes held-out predictions for two targets:
+
+1. `career_games_started` (sections 1–5), the original target.
+2. **Rookie-season scrimmage snaps** (sections 6–8), a new target that gives every draft class the same one-season exposure window.
+
+Outputs (all in [`outputs/`](outputs/)):
+
+| File | Contents |
+|---|---|
+| [`validation_metrics.csv`](outputs/validation_metrics.csv) | Holdout and CV metrics for `career_games_started` |
+| [`holdout_predictions.csv`](outputs/holdout_predictions.csv) | Held-out predictions for `career_games_started` |
+| [`rookie_validation_metrics.csv`](outputs/rookie_validation_metrics.csv) | Holdout and CV metrics for `log1p(rookie_snaps)` |
+| [`rookie_holdout_predictions.csv`](outputs/rookie_holdout_predictions.csv) | Held-out rookie-snap predictions (back-transformed to snaps) |
+
+**Inputs and steps.**
+
+- **Data:** Download the competition CSVs from the [Kaggle data page](https://www.kaggle.com/competitions/nfl-big-data-bowl-2027/data) into `data/`. The folder is git-ignored and is not redistributed. The pipeline reads `combine_results.csv`, `player_career_successes.csv`, `players.csv`, `games.csv`, and `player_play.csv`.
+- **Preparation:** Combine results are joined one-to-one with career outcomes and draft position on `nfl_id`, giving 510 players. Draft position is encoded as `log(overall pick)`, with undrafted players (127) set to pick 300 plus an `undrafted` flag. Rookie snaps count the regular-season plays in `player_play.csv` from each player's draft-year season. As a check, they correlate 0.964 with career scrimmage snaps for the 2025 class, whose rookie season is their whole career.
+- **Models:** Each model is a scikit-learn `Pipeline` with median imputation plus missing-value indicators (skipping a drill can be informative) and one-hot position encoding. The two models are `RidgeCV` with standardized inputs and a shallow `HistGradientBoostingRegressor` (`max_depth=3`, `min_samples_leaf=20`). All preprocessing is fitted inside each training fold.
+- **Feature sets:** The feature sets are nested: Combine measurements → + NGS scores → + draft pick. A draft-pick-only reference shows how much the NFL's own evaluation already explains. `draft_year` is included as an exposure control for career starts only.
+- **Reproduce** from the repo root:
+
+  ```bash
+  uv sync
+  uv run jupyter nbconvert --to notebook --execute --inplace kaggle_pipeline.ipynb
+  ```
+
+  The run takes about 40 seconds on a laptop.
+
+**Diagnostic.** Every model, feature set, and target is scored on the same splits, so comparisons are paired:
+
+- a 75/25 holdout, stratified by position (`random_state=307`),
+- repeated stratified 5-fold CV (5 folds × 3 repeats = 15 scores per model).
+
+The metric is MAE against a mean-prediction baseline. RMSE and R² are also reported.
+
+*Career games started* (CV MAE, mean ± sd across the 15 folds):
+
+| Features | Ridge | HistGradientBoosting |
+|---|---|---|
+| Mean baseline | 8.84 ± 0.38 | |
+| Combine | 8.28 ± 0.36 | 8.53 ± 0.58 |
+| Combine + NGS | 6.79 ± 0.23 | 6.37 ± 0.44 |
+| Combine + NGS + draft pick | 5.88 ± 0.39 | 5.06 ± 0.36 |
+| Draft pick only | 5.87 ± 0.38 | **4.95 ± 0.36** |
+
+*Rookie snaps* (CV MAE on the `log1p` scale):
+
+| Features | Ridge | HistGradientBoosting |
+|---|---|---|
+| Mean baseline | 2.25 ± 0.11 | |
+| Combine | 2.23 ± 0.10 | 2.21 ± 0.15 |
+| Combine + NGS | 1.87 ± 0.09 | 1.80 ± 0.08 |
+| Combine + NGS + draft pick | 1.54 ± 0.08 | 1.45 ± 0.08 |
+| Draft pick only | 1.51 ± 0.08 | **1.40 ± 0.08** |
+
+On the holdout, the Combine + NGS boosting model predicts rookie snaps with an MAE of 195 snaps, against 246 for the baseline.
+
+**What this shows so far.**
+
+- **Raw Combine measurements alone carry almost no signal for either target.** This explains why the first version of this pipeline lost to the mean baseline. The earlier version used a single unstratified split and default boosting settings, so its numbers (holdout MAE 8.97 vs. 8.30) are not directly comparable to the table above.
+- **NGS scores are the largest pre-draft gain.** They cut MAE by about 25% for career starts and about 20% for rookie snaps. The production-based scores correlate more strongly with career starts (Spearman 0.46 for `ngs_college_production_score`, 0.55 for `ngs_final_score`) than `ngs_athleticism_score` does (0.25).
+- **Draft pick alone matches or beats every combination of Combine and NGS features.** Adding Combine and NGS features on top of draft pick does not improve CV MAE. Teams appear to have already priced in the Combine. The useful question for Pipeline 2 is therefore whether tracking features add information *beyond* draft position.
+- **The largest errors are early starters predicted to barely play,** mostly offensive linemen and defensive linemen. These players were probably valued for reasons the measured drills do not capture.
+- **Rookie snaps fix the exposure problem.** Mean rookie snaps are 242 for the 2023 class, 248 for 2024, and 230 for 2025. Mean career starts, by contrast, are 12.5, 8.0, and 3.4.
+
+## Route B progress
+
+- **Path from raw data to predictions:** [`kaggle_pipeline.ipynb`](kaggle_pipeline.ipynb) covers preparation (sections 2 and 6), pipeline definition (section 3), local validation (sections 4 and 7), and training plus held-out inference (sections 5 and 8). Use the run command above.
+- **Local validation and why it fits:** The splits are made at the player level, so each player appears once and no player is in both training and validation. Stratifying by position keeps the DB/OL/DL/WR/TE mix the same in every fold. Repeated CV gives a spread, which matters with only 510 players: the mean baseline's single-split MAE was 8.30 on the original split and 9.45 on the current one. Because rookie snaps measure the same window for every class, a random split does not mix exposure levels. A by-draft-year split is the next robustness check.
+- **Kaggle submission:** To be added.
+- **Second pipeline:** Pipeline 2 will add per-player aggregates from `combine_tracking.csv` (for example top speed, peak acceleration, and time to top speed in the 40, and change-of-direction speed in the shuttle and three-cone). It will use the same feature-set and fold structure, and the key comparisons are on the rookie-snaps target:
+  - Combine + NGS vs. Combine + NGS + tracking: does tracking add signal before the draft?
+  - Draft pick vs. draft pick + tracking: does tracking add signal beyond what teams already know?
+
+## Next question
+
+- **Plan changes since November 5:** The first run showed that raw career starts mostly reflect how many seasons a player has had: the 2023 class has three, the 2025 class has one. We added rookie-season snaps as an equal-exposure target and now treat draft position as a reference model rather than an ordinary feature, because it alone explains about half the variance.
+- **Uncertain or blocked:** Tracking coverage varies by drill (418 players for the 40, about 160–170 for the shuttle and three-cone). Shuttle and three-cone features will be mostly missing, so we will start with 40-yard-dash features and rely on missing-value indicators for the rest. If tracking features add nothing beyond draft pick, we will report that as a negative result and examine position-specific effects as exploratory analysis.
