@@ -1,7 +1,7 @@
 [project]
 name = "stat486-kaggle-project"
 version = "0.1.0"
-description = "Add your description here"
+description = "STAT 486 project: predicting early NFL playing time from Combine, NGS, and tracking data (NFL Big Data Bowl)"
 readme = "README.md"
 authors = [
     { name = "Jose De Leon", email = "jdleon4@byu.edu" }
@@ -10,6 +10,7 @@ requires-python = ">=3.13"
 dependencies = [
     "ipykernel>=7.4.0",
     "matplotlib>=3.11.2",
+    "nbconvert>=7.17.2",
     "numpy>=2.5.4",
     "pandas>=3.1.1",
     "scikit-learn>=1.9.1",
